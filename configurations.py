@@ -1,3 +1,5 @@
+'''to easily have each configuration of the disentanglement_dataset'''
+
 import numpy as np
 
 FACTORS = {
@@ -7,8 +9,8 @@ FACTORS = {
     "camera_height": ["top", "center", "bottom"],
     "background_color": ["purple", "sea green", "salmon"],
 }
-SHAPE = tuple(len(values) for values in FACTORS.values())  # (6, 6, 2, 3, 3)
-N_CONFIGS = int(np.prod(SHAPE))  # 648
+SHAPE = tuple(len(values) for values in FACTORS.values())
+N_CONFIGS = int(np.prod(SHAPE))
 
 
 def encode(config: tuple[int, ...]) -> int:

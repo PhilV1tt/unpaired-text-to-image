@@ -1,0 +1,289 @@
+% Note de cadrage du cours 2 (projet fil rouge, MSc2 AI, ECE Paris).
+% Compiler : pdflatex 02_cadrage_metier_roi_architecture.tex (deux passes).
+% Les chiffres du business case viennent de roi.py et de 02_hypotheses_roi.csv.
+\documentclass[10pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage[margin=1.8cm]{geometry}
+\usepackage{tabularx,booktabs,array}
+\usepackage[scale=0.835]{plex-sans}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds,calc}
+% Couleurs et styles TikZ du gabarit Horama (horama.sty).
+\definecolor{horamanuit}{HTML}{0B2545}
+\definecolor{horamableu}{HTML}{1B5E9E}
+\definecolor{horamavert}{HTML}{1E9C7B}
+\definecolor{horamaocre}{HTML}{E0A030}
+\tikzset{
+  bloc/.style={draw=none,rounded corners=4pt,minimum height=2.8em,
+    minimum width=2.3cm,inner xsep=0.6em,inner ysep=0.45em,align=center,
+    font=\sffamily\small,text=horamanuit},
+  capteur/.style={bloc,fill=horamableu!14},
+  calcul/.style={bloc,fill=horamavert!15},
+  sortie/.style={bloc,fill=horamaocre!22},
+  neutre/.style={bloc,fill=black!6,text=black!70},
+  etape/.style={circle,fill=horamanuit,text=white,font=\sffamily\scriptsize\bfseries,
+    inner sep=0pt,minimum size=1.3em},
+  flux/.style={-{Stealth[length=5pt,width=4pt]},black!65,line width=0.7pt},
+  synchro/.style={-{Stealth[length=5pt,width=4pt]},black!40,line width=0.6pt,dash pattern=on 3pt off 2pt},
+  annotation/.style={font=\sffamily\footnotesize,text=black!60},
+  groupe/.style={draw=#1!40,line width=0.6pt,rounded corners=6pt,inner xsep=0.35cm,inner ysep=0.4cm},
+}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\setlist{nosep,leftmargin=*}
+\setlength{\parskip}{3pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.15}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+
+\title{\vspace{-1.2cm}\textbf{Générer une image à partir d'un texte sans paires annotées}\\[2pt]
+\large Note de cadrage, cours 2 (métier, ROI, architecture)}
+\author{Philémon VITTET \quad Sidi HAMADI \quad Ines ZERDANI \quad Patrick YVAN EYIKE}
+\date{4 novembre 2026}
+
+\begin{document}
+\maketitle
+\vspace{-0.6cm}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{@{}lL@{}}
+\toprule
+Titre provisoire & Alignement texte-image sans paires et génération par diffusion pour l'étiquetage d'images de robotique \\
+Utilisateur principal & Ingénieure données vision d'une équipe de robotique de préhension (tri de pièces) \\
+Problématique & Relier les fiches texte du catalogue produit aux images des caméras sans annoter des milliers de paires \\
+Type de génération & Images 64$\times$64 générées par un modèle de diffusion conditionné, à partir d'une description texte \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+%==============================================================
+\section{Problème et métier (AS IS)}
+
+\textbf{Persona.} Léa est ingénieure données dans une équipe qui entraîne le système de vision d'une cellule robotisée de tri. Le robot saisit des pièces décrites dans un catalogue par leurs attributs (couleur, forme, taille). \textbf{Événement déclencheur :} l'ajout de nouvelles références au catalogue ou un nouveau lot d'images des caméras.
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}P{0.3cm}LLP{3.7cm}@{}}
+\toprule
+& Étape & Acteur / outil / données & Durée, fréquence, difficulté \\
+\midrule
+1 & Création de la fiche texte de la référence & Responsable produit / PLM & 10 min par référence \\
+2 & Capture d'images dans la cellule & Caméras / flux non étiqueté & automatique, continu \\
+3 & Sélection d'un lot à annoter & Léa / script & 30 min par lot \\
+4 & Association image $\leftrightarrow$ référence et attributs & Annotateur / Label Studio & 0,5 min par image [H, à mesurer] \\
+5 & Contrôle qualité (double annotation de 10 \%) & Léa & confusions entre couleurs proches \\
+6 & Entraînement du modèle de vision & Léa / GPU & quelques heures par itération \\
+7 & Prise de vue dédiée si une configuration manque & Technicien / cellule & environ 4 h par séance [H] \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Goulot :} l'étape 4, proportionnelle au volume d'images. \textbf{Contrôle humain indispensable :} la validation des étiquettes avant l'entraînement, car une étiquette fausse se propage dans le modèle. Trois irritants :
+\begin{enumerate}
+\item le temps d'annotation : volume annuel $\times$ 0,5 min par image ;
+\item les confusions entre attributs proches (deux teintes voisines), qui sont les erreurs les plus coûteuses parce qu'elles passent le contrôle ;
+\item les configurations rares jamais filmées, qui laissent le modèle aveugle et imposent une prise de vue dédiée.
+\end{enumerate}
+
+%==============================================================
+\section{Solutions alternatives}
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}P{2.9cm}LLP{1.6cm}@{}}
+\toprule
+Approche & Comment elle répond & Limite & Décision \\
+\midrule
+Statu quo & Annotation manuelle de chaque image & Coût linéaire en volume ; aucune image pour les configurations rares & écarté \\
+Règles & Seuils de couleur, gabarits de forme & Fragile à l'éclairage et à la pose ; ne couvre pas la variété & écarté \\
+ML discriminatif & Classifieur d'attributs & Exige des milliers d'images étiquetées ; ne produit aucune image d'une configuration absente & baseline \\
+Gen AI avec paires (texte$\to$image fine-tuné) & Génère depuis la fiche & Exige justement les paires image-texte qu'on n'a pas & écarté \\
+\textbf{Gen AI sans paires (retenue)} & Deux encodeurs entraînés séparément, alignés par leur géométrie, puis génération par diffusion & Peut confondre des attributs symétriques : le projet prédit ces cas et les corrige avec quelques ancres & \textbf{retenu} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Pourquoi générer plutôt que prédire.} La génération (i) fournit des images d'entraînement pour les configurations jamais filmées, ce qu'aucun classifieur ne peut faire, et (ii) montre à Léa ce que le système a compris d'une fiche texte avant qu'il étiquette quoi que ce soit, ce qui sert de contrôle visuel de l'alignement.
+
+%==============================================================
+\section{Produit cible (TO BE)}
+
+\begin{enumerate}
+\item \textbf{Entrée.} Léa charge un lot d'images non étiquetées et les fiches texte du catalogue. Aucune paire n'est fournie.
+\item \textbf{Validation des données.} Format, doublons, couverture des attributs.
+\item \textbf{Alignement et audit.} Le système aligne l'espace texte et l'espace image (rotation par Wasserstein-Procrustes). L'audit calcule les symétries du catalogue et liste les \emph{quelques} images à étiqueter à la main pour lever les ambiguïtés (ancres). \emph{Point d'échec possible :} une ambiguïté non détectée.
+\item \textbf{Annotation des ancres.} Léa étiquette 2 à 20 images au lieu de milliers. C'est une tâche nouvelle.
+\item \textbf{Génération.} Pour chaque fiche, le modèle de diffusion génère des images de la référence, y compris pour les configurations jamais filmées.
+\item \textbf{Contrôle qualité automatique.} Un classifieur d'attributs vérifie que l'image générée respecte la fiche. Les images sous le seuil sont rejetées.
+\item \textbf{Vérification humaine.} Léa valide par échantillon (0,05 min par image [H]) les étiquettes automatiques et les images générées. Cette relecture n'est pas gratuite et entre dans le ROI.
+\item \textbf{Décision et sauvegarde.} Le jeu étiqueté et augmenté part à l'entraînement. Images, étiquettes, versions des modèles et décisions sont journalisées.
+\end{enumerate}
+\textbf{Tâches supprimées :} l'annotation image par image (étape 4) et une partie des prises de vue (étape 7). \textbf{Créées :} l'annotation des ancres et la revue des générations. \textbf{Valeur :} moins de minutes humaines par image, à précision égale, et une couverture des configurations rares.
+
+%==============================================================
+\section{Architecture initiale}
+
+\begin{center}
+\begin{tikzpicture}[node distance=1.15cm and 1.05cm, bloc/.append style={text width=2.45cm}]
+\node[capteur] (ui) {\bfseries Interface web\\[-2pt]\scriptsize Streamlit};
+\node[neutre, right=of ui] (api) {\bfseries API\\[-2pt]\scriptsize FastAPI, validation};
+\node[calcul, right=of api] (enc) {\bfseries Encodeurs JEPA\\[-2pt]\scriptsize texte et image};
+\node[calcul, right=of enc] (ali) {\bfseries Alignement\\[-2pt]\scriptsize Procrustes + audit};
+\node[calcul, below=of ali] (dif) {\bfseries Diffusion\\[-2pt]\scriptsize DDPM conditionnée};
+\node[calcul, below=of enc] (qc) {\bfseries Contrôle auto\\[-2pt]\scriptsize classifieur d'attributs};
+\node[sortie, below=of api] (hum) {\bfseries Revue humaine\\[-2pt]\scriptsize Léa, dans l'UI};
+\node[neutre, below=of ui] (db) {\bfseries Stockage et logs\\[-2pt]\scriptsize SQLite, PNG, MLflow};
+\node[neutre, below=of hum] (tst) {\bfseries Tests et CI\\[-2pt]\scriptsize pytest, GitHub Actions};
+\foreach \n/\k in {ui/1,api/2,enc/3,ali/4,dif/5,qc/6,hum/7,db/8,tst/9}{\node[etape] at (\n.north west){\k};}
+\draw[synchro] (tst.west) -| node[above,annotation,pos=0.25]{données} (db.south);
+\draw[synchro] (tst.east) -| node[above,annotation,pos=0.25]{modèles} (qc.south);
+\draw[flux] (ui) -- node[above,annotation]{lot} (api);
+\draw[flux] (api) -- node[above,annotation]{données} (enc);
+\draw[flux] (enc) -- node[above,annotation]{vecteurs} (ali);
+\draw[flux] (ali) -- node[right,annotation]{condition} (dif);
+\draw[flux] (dif) -- node[above,annotation]{images} (qc);
+\draw[flux] (qc) -- node[above,annotation]{retenues} (hum);
+\draw[flux] (hum) -- node[above,annotation]{décision} (db);
+\draw[synchro] (db) -- node[left,annotation]{historique} (ui);
+\begin{scope}[on background layer]
+\node[groupe=horamavert, fit=(enc)(ali)(dif)(qc),
+  label={[font=\sffamily\scriptsize\bfseries,text=horamavert!70!black,anchor=south west]north west:MODÈLES (DGX SPARK)}] {};
+\end{scope}
+\end{tikzpicture}
+
+\smallskip
+{\sffamily\scriptsize
+\tikz\fill[horamableu!40] (0,0) rectangle (0.25,0.25); entrée \quad
+\tikz\fill[horamavert!40] (0,0) rectangle (0.25,0.25); modèles \quad
+\tikz\fill[horamaocre!50] (0,0) rectangle (0.25,0.25); contrôle humain \quad
+\tikz\fill[black!15] (0,0) rectangle (0.25,0.25); infrastructure \quad
+\tikz\draw[synchro] (0,0.1) -- (0.5,0.1); lecture, test}
+\end{center}
+\vspace{-4pt}
+{\small \textbf{Architecture initiale.} Les étapes 3 à 6 tournent sur un DGX Spark ; l'interface, l'API et le stockage tournent sur un poste ou un petit serveur. Seule l'étape 7 demande un humain. Les tests (9) couvrent l'API, le schéma des données et les modèles (justesse des attributs sur un jeu fixe) et tournent à chaque commit.}
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}P{2.4cm}P{4.6cm}L@{}}
+\toprule
+Brique & Choix pressenti & Pourquoi / alternative \\
+\midrule
+Interface & Streamlit : chargement des fiches, grille de génération, file de revue & Rapide à construire ; alternative React si le temps le permet \\
+Backend / API & FastAPI : \texttt{/align}, \texttt{/audit}, \texttt{/generate}, \texttt{/review} ; timeout 30 s & Typage, documentation OpenAPI \\
+Modèles & JEPA image (LeJEPA ; bonnes vues = deux positions caméra d'une même pièce ; pas de jitter de teinte) ; JEPA texte (recette publique \texttt{prh-proof}, MIT) sur fiches paraphrasées ; alignement par appariement ensemencé ; DDPM conditionné, guidance sans classifieur & Petits modèles (1 à 8 M de paramètres) ; aucun poids pré-entraîné requis \\
+Données & MPI3D-real (principal), 3D Shapes (contrôle) ; fiches générées à partir des attributs & Facteurs connus, donc vérité terrain exacte \\
+Stockage & SQLite (métadonnées, décisions), fichiers PNG, MLflow (runs) & Simple et reproductible ; conservation pendant la durée du projet \\
+Évaluation & Justesse des attributs générés, diversité, FID, latence p50/p95 & Voir H1 et H2 \\
+Calcul & MacBook Pro M5 (développement), 2 DGX Spark (entraînements) & Débits mesurés sur le Mac : 287 img/s (encodeur), 88 img/s (diffusion) \\
+\bottomrule
+\end{tabularx}
+\end{center}
+\textbf{Reproductibilité :} dépôt Git unique, dépendances verrouillées avec \texttt{uv}, seeds fixées et affichées, scripts de téléchargement des données (rien de lourd dans le dépôt).
+
+%==============================================================
+\section{Données et droits}
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}P{2.2cm}LL@{}}
+\toprule
+Jeu & Volume / format & Droits / limite \\
+\midrule
+D1 : 3D Shapes & 480\,000 images 64$\times$64, 6 facteurs connus (3 teintes à 10 valeurs, échelle, forme, orientation) & Apache 2.0 ; contrôle synthétique, une seule image par configuration \\
+D2 : MPI3D-real & 1\,036\,800 photos réelles 64$\times$64 d'un bras robot ; 648 configurations (6 couleurs, 6 formes, 2 tailles, 3 hauteurs de caméra, 3 fonds) vues sous 40$\times$40 positions & CC-BY-4.0 ; jeu principal : plusieurs photos par configuration, donc de bonnes vues natives \\
+Fiches texte & Générées par une grammaire de paraphrases à partir des facteurs & Produites par le groupe \\
+Test & Combinaisons d'attributs retirées de tout l'entraînement (texte et image) & Test indépendant pour H1 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+Aucune donnée personnelle ni confidentielle. Les splits sont faits par \emph{combinaison d'attributs}, pas par image, pour éviter les fuites.
+
+%==============================================================
+\section{Business case}
+
+Les formules sont celles du cahier des charges (section 04). Toutes les valeurs sont des hypothèses [H]. La méthode d'estimation est indiquée, et le calcul est fait par script (\texttt{roi.py}, \texttt{02\_hypotheses\_roi.csv}).
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}P{4.3cm}P{2.3cm}L@{}}
+\toprule
+Variable & Central & Source / méthode \\
+\midrule
+Volume annuel d'images à étiqueter & 60\,000 & [H] 120 références par an $\times$ 500 images par référence \\
+Minutes gagnées par image & 0,40 & [H] 0,5 min en manuel $\to$ 0,1 min en validation ; à mesurer (E0) \\
+Coût horaire chargé & 45 €/h & [H] technicien ou annotateur, salaire chargé \\
+Revue humaine ajoutée par image & 0,05 min & [H] ancres + revue des images générées \\
+Autres gains (prises de vue évitées) & 4\,000 €/an & [H] 20 séances $\times$ 4 h $\times$ 45 €/h, arrondi \\
+Investissement initial & 25\,000 € & [H] intégration et développement \\
+Calcul annuel & 2\,000 € & [H] électricité et amortissement partiel des Spark \\
+Maintenance et supervision & 8\,000 €/an & [H] \\
+Taux de reprise & 5 \% & [H] réétiquetage manuel des erreurs \\
+\bottomrule
+\end{tabularx}
+
+\vspace{4pt}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Scénario & Gain net/an & Coût année 1 & ROI année 1 & Retour \\
+\midrule
+Pessimiste (20\,000 img, 0,25 min, 40 €/h) & 2\,500 € & 50\,000 € & $-95{,}0$ \% & non atteint \\
+Central (60\,000 img, 0,40 min, 45 €/h) & 18\,625 € & 35\,000 € & $-46{,}8$ \% & 34,8 mois \\
+Optimiste (150\,000 img, 0,45 min, 50 €/h) & 59\,250 € & 28\,000 € & $+111{,}6$ \% & 4,7 mois \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Lecture.} Le paramètre décisif est le \emph{volume} d'images. Pour une seule cellule, le ROI de la première année est négatif dans les scénarios central et pessimiste. Le projet devient rentable s'il est mutualisé sur plusieurs cellules ou plusieurs lignes de produits. Ces chiffres ne démontrent pas la valeur causale de la Gen AI : c'est le rôle de H1.
+
+%==============================================================
+\section{Risques}
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}P{2.6cm}P{2.3cm}L@{}}
+\toprule
+Risque & Proba. / impact & Réduction / test \\
+\midrule
+Qualité : attribut faux (mauvaise couleur) & moyenne / fort & Audit des symétries avant génération, ancres, classifieur de contrôle, revue humaine \\
+Alignement : solveur bloqué, ancres mal choisies & moyenne / fort & Ancres choisies comme base du groupe de symétrie ; test sur le noyau exact avant tout entraînement (fait) \\
+Géométrie texte trop pauvre & moyenne / fort & Contrôle de deux seeds du JEPA texte entre elles ; dimension $k$ prise en fin de bloc spectral \\
+Résultat circulaire & moyenne / moyen & Mêmes règles de voisinage des deux côtés : conclusion énoncée comme conditionnelle ; relance avec indices image permutés \\
+Données / licences & faible / moyen & Jeux publics Apache 2.0 et CC-BY-4.0 ; manifeste de téléchargement \\
+Mémorisation & faible / faible & Distance au plus proche voisin d'entraînement pour chaque image générée \\
+Coût / latence & faible / moyen & Inférence locale sur Spark ; mesure p50/p95 ; budget par requête \\
+Biais / couverture & moyenne / fort & Évaluation par configuration, en particulier les configurations rares retirées \\
+Dépendance modèle & faible / faible & Modèles entraînés par le groupe, aucune API externe \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+%==============================================================
+\section{Hypothèses testables, expériences et références}
+
+\textbf{H1 (valeur).} Sur les combinaisons d'attributs retirées de l'entraînement, un classifieur d'attributs entraîné sur les images réelles \emph{plus} les images générées depuis les fiches atteint une exactitude supérieure d'au moins 10 points au même classifieur entraîné sur les images réelles seules. Seuil proposé par le groupe.
+
+\textbf{H2 (exploitation).} Générer 16 images 64$\times$64 sur un DGX Spark prend moins de 3 s au p95, et chaque génération est relue par échantillonnage dans l'UI. Seuil proposé, à mesurer.
+
+\textbf{Hypothèse de recherche (cœur scientifique).} Quand le catalogue est symétrique (attributs équiprobables et interchangeables), l'alignement sans paires confond les attributs selon le groupe de symétrie du catalogue, quelle que soit la quantité de données. Un petit nombre d'ancres, choisies pour former une \emph{base} de ce groupe (un ensemble de configurations qu'aucune symétrie non triviale ne laisse fixes), suffit à lever toutes les confusions. Ce nombre est la taille de base du groupe : 5 pour MPI3D-real, contre 32 dimensions d'embedding et 648 configurations. Réfutée si des encodeurs appris exigent nettement plus d'ancres que ce nombre, ou si des ancres quelconques font aussi bien qu'une base.
+
+\textbf{E0 (préalable).} Mesurer nous-mêmes le temps d'annotation manuelle sur 200 images pour remplacer l'hypothèse de 0,5 min.
+
+\textbf{E1 (baseline sans Gen AI).} Classifieur entraîné sur images réelles seules, plus recherche du plus proche voisin réel dans l'espace aligné. Métrique : exactitude par attribut sur le test des combinaisons retirées.
+
+\textbf{E2 (avec diffusion).} Même protocole avec les images générées ajoutées. Mesures : exactitude, diversité, FID, latence et coût. Au moins deux configurations de diffusion (DDPM et flow matching, avec et sans guidance).
+
+\textbf{E3 (alignement).} Pour 0, 5 et 10 ancres, aléatoires ou formant une base : exactitude de l'appariement des 648 configurations, contre deux références, Procrustes sur les seules ancres et la méthode sans paires de Schnaus et al.
+
+\textbf{Pistes scientifiques.}
+\begin{enumerate}
+\item Balestriero \& LeCun (2026), \emph{Proving and Improving the Platonic Representation Hypothesis with JEPAs}, \href{https://arxiv.org/abs/2610.39302}{arXiv:2610.39302}. Apport : avec de bonnes vues, des JEPA entraînés séparément sur deux modalités apprennent la même représentation à une rotation près. Limite : suppose la même distribution de paires positives et un trou spectral.
+\item Schnaus, Dagès, Cremers, Wang \& Isola (2026), \emph{Shared Geometry as a Rosetta Stone}, \href{https://arxiv.org/abs/2610.09411}{arXiv:2610.09411}. Apport : alignement texte-image sans aucune paire (k-means, appariement des centres, puis Wasserstein-Procrustes) et génération par diffusion à partir d'un texte aligné. Limite : alignement grossier ; les auteurs ne savent pas dire, sans paires, si l'alignement est fiable, et ne traitent pas les symétries.
+\item Xu \& Kanan (2026), \emph{More Data Cannot Break a Symmetry}, \href{https://arxiv.org/abs/2608.27651}{arXiv:2608.27651}. Apport : les symétries des stimuli bornent l'alignement non supervisé. Limite : stimuli fixes en neurosciences, sans modèles appris entre modalités ni méthode de désambiguïsation par ancres ; c'est l'ouverture que notre projet traite.
+\item Ho, Jain \& Abbeel (2020), \emph{Denoising Diffusion Probabilistic Models}, \href{https://arxiv.org/abs/2006.11239}{arXiv:2006.11239}. Base du générateur.
+\end{enumerate}
+
+\textbf{Suite pour le jalon Multi-LLM / Green AI.} Les demandes en langage libre (« une grande pièce cylindrique rouge ») seront converties en fiche contrôlée par un LLM. On comparera un modèle unique et un routage entre petit et grand modèle (qualité, latence, coût), et on mesurera l'énergie et le CO$_2$e de la chaîne complète : LLM, encodeurs et diffusion.
+
+\textbf{Vérifications faites avant de coder (4 novembre).} Deux tests numpy sur l'embedding théorique exact, sans réseau entraîné (\texttt{analytic\_test.py}, \texttt{anchor\_test.py}). Sur le noyau de MPI3D-real (648 configurations, bruit de 0 et 5 \%), l'appariement sans ancre donne 0 \% ; 5 ancres aléatoires donnent 78 à 85 \% ; 5 ancres formant une base donnent 100 \% ; 10 ancres aléatoires donnent 100 \%. Procrustes sur les seules ancres plafonne entre 3 et 21 \% : c'est la géométrie de tout le nuage, pas les ancres seules, qui porte l'alignement. Sur un monde plus petit, des fréquences d'attributs très inégales suffisent sans ancre en l'absence de bruit, mais le solveur échoue dès 5 \% de bruit. Le livrable visé est donc la génération avec une base d'ancres ; le zéro-paire est une question étudiée, pas une promesse.
+
+\textbf{Contrôles prévus avant la diffusion.} Deux seeds du JEPA texte doivent s'aligner entre elles, faute de quoi l'alignement avec l'image est hors de portée. La dimension $k$ est prise à la fin d'un bloc de valeurs propres égales, sinon le théorème d'unicité ne s'applique pas. Chaque attribut doit rester lisible par une sonde linéaire dans l'embedding image, quelle que soit la position de la caméra.
+
+\end{document}

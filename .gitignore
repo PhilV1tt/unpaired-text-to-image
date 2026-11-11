@@ -1,0 +1,36 @@
+# agent instruction files
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.cursorrules
+.claude/
+.codex/
+.codegraph/
+.cursor/
+.gemini/
+
+# python
+.venv/
+__pycache__/
+.ruff_cache/
+.pytest_cache/
+
+# heavy artefacts stay on the Spark
+data/*
+!data/MANIFEST.md
+checkpoints/
+*.pt
+*.safetensors
+wandb/
+
+# latex build files
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+.DS_Store

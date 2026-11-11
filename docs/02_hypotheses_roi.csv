@@ -1,0 +1,4 @@
+scenario,vol,gain,h,review,other,invest,compute,maint,rework,gain_brut,cout_revue,cout_reprise,gain_net,cout_annee1,roi_annee1_pct,retour_mois
+pessimiste,20000,0.25,40,0.1,1500,35000,3000,12000,0.15,3333,1333,1000,2500,50000,-95.0,nan
+central,60000,0.4,45,0.05,4000,25000,2000,8000,0.05,18000,2250,1125,18625,35000,-46.8,34.8
+optimiste,150000,0.45,50,0.03,8000,20000,2000,6000,0.02,56250,3750,1250,59250,28000,111.6,4.7

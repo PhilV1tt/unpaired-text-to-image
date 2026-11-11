@@ -1,6 +1,6 @@
 # Générer une image à partir d'un texte sans paires annotées
 
-Projet fil rouge Gen AI, ECE Paris MSc2 AI (2026-2027).
+Projet Gen AI
 
 ## Rendu C2 (cadrage)
 
@@ -15,4 +15,4 @@ uv run ruff check .
 uv run pytest
 ```
 
-Les jeux de données et les checkpoints ne sont pas dans le repo. L'entraînement tourne sur un DGX Spark.
+Les jeux de données et les checkpoints ne sont pas dans le repo. L'entraînement tourne sur deux DGX Sparks.

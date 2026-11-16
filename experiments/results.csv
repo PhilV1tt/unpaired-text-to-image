@@ -1,0 +1,13 @@
+experiment,split,factor,accuracy,n_images,seed,status
+E1,seen,object_color,0.9413,5400,0,measured
+E1,seen,object_shape,0.7911,5400,0,measured
+E1,seen,object_size,0.9819,5400,0,measured
+E1,seen,camera_height,1.0,5400,0,measured
+E1,seen,background_color,1.0,5400,0,measured
+E1,seen,all,0.74,5400,0,measured
+E1,held_out,object_color,0.8519,10800,0,measured
+E1,held_out,object_shape,0.1268,10800,0,measured
+E1,held_out,object_size,0.9667,10800,0,measured
+E1,held_out,camera_height,1.0,10800,0,measured
+E1,held_out,background_color,1.0,10800,0,measured
+E1,held_out,all,0.0964,10800,0,measured

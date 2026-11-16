@@ -17,7 +17,7 @@ def embed_all(N_CONFIGS = configurations.N_CONFIGS):
     return embeddings
 
 def distance_matrix(embeddings: np.ndarray) -> np.ndarray:
-    n = embeddings.shape[1]  # embeddings is (20, N_CONFIGS)
+    n = embeddings.shape[0]  # embeddings is (CONFIGS, SUM(SHAPE))
     dist = np.zeros((n, n))
     for i in range(n):
         for j in range(n):

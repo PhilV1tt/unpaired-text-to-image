@@ -14,12 +14,17 @@ N_CONFIGS = int(np.prod(SHAPE))
 
 
 def check(config: tuple[int, ...]) -> None:
-    """Raise if a config has the wrong length, a non-integer index or an index outside its factor's range."""
+    """Raise if a config has the wrong length, a non-integer index
+    or an index outside its factor's range."""
     if len(config) != len(SHAPE):
         raise ValueError(f"config {config} has {len(config)} coordinates, expected {len(SHAPE)}")
     for name, a, n in zip(FACTORS, config, SHAPE, strict=True):
-        if isinstance(a, bool) or not isinstance(a, (int, np.integer)):
-            raise TypeError(f"config {config}: {name} = {a!r} is a {type(a).__name__}, expected int")
+        # runtime guard: the type hint does not stop a caller from passing a float or a str
+        is_int = isinstance(a, (int, np.integer))  # pyright: ignore[reportUnnecessaryIsInstance]
+        if isinstance(a, bool) or not is_int:
+            raise TypeError(
+                f"config {config}: {name} = {a!r} is a {type(a).__name__}, expected int"
+            )
         if not 0 <= a < n:
             raise ValueError(f"config {config}: {name} = {a} is outside [0, {n - 1}]")
 

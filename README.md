@@ -15,4 +15,4 @@ uv run ruff check .
 uv run pytest
 ```
 
-Les jeux de données et les checkpoints ne sont pas dans le repo. L'entraînement tourne sur deux DGX Sparks.
+Les jeux de données, les termes d'entreprises et les checkpoints ne sont pas dans le repo. L'entraînement tourne sur deux DGX Sparks. 

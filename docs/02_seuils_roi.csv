@@ -1,0 +1,12 @@
+levier,entree,seuil,unite
+cellules,1,-46.8,ROI annee 1 %
+cellules,2,0.7,ROI annee 1 %
+cellules,3,43.3,ROI annee 1 %
+cellules,4,81.7,ROI annee 1 %
+ecart,1 cellule,16375,EUR manquants annee 1
+erreurs,"100000 pieces, 1% rares",163.8,EUR par erreur evitee
+erreurs,"500000 pieces, 1% rares",32.8,EUR par erreur evitee
+erreurs,"1000000 pieces, 5% rares",3.3,EUR par erreur evitee
+mise en service,1 j gagnes par reference,136.5,EUR par reference et par jour
+mise en service,3 j gagnes par reference,45.5,EUR par reference et par jour
+mise en service,5 j gagnes par reference,27.3,EUR par reference et par jour

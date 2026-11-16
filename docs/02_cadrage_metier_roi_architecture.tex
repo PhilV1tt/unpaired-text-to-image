@@ -99,13 +99,17 @@ Approche & Comment elle répond & Limite & Décision \\
 Statu quo & Annotation manuelle de chaque image & Coût linéaire en volume ; aucune image pour les configurations rares & écarté \\
 Règles & Seuils de couleur, gabarits de forme & Fragile à l'éclairage et à la pose ; ne couvre pas la variété & écarté \\
 ML discriminatif & Classifieur d'attributs & Exige des milliers d'images étiquetées ; ne produit aucune image d'une configuration absente & baseline \\
-Gen AI avec paires (texte$\to$image fine-tuné) & Génère depuis la fiche & Exige justement les paires image-texte qu'on n'a pas & écarté \\
+VLM généraliste (GPT, Gemini, Qwen-VL) & Le modèle lit chaque image et donne ses attributs, sans entraînement & Ne produit aucune image ; ses erreurs sur les teintes voisines ne sont pas signalées ; coût par image, et les images partent chez un tiers ou demandent un serveur GPU & baseline (E1b) \\
+Texte$\to$image généraliste & Génère depuis la fiche, sans entraînement & Images hors domaine (autre caméra, autre éclairage) ; mélange les attributs quand la fiche en combine plusieurs & écarté \\
+Gen AI avec paires (texte$\to$image fine-tuné) & Génère depuis la fiche & Exige des paires image-texte. Un VLM peut les produire : c'est la chaîne concurrente la plus sérieuse, mais elle garde les erreurs silencieuses du VLM & comparé (E1b) \\
 \textbf{Gen AI sans paires (retenue)} & Deux encodeurs entraînés séparément, alignés par leur géométrie, puis génération par diffusion & Peut confondre des attributs symétriques : le projet prédit ces cas et les corrige avec quelques ancres & \textbf{retenu} \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
 \textbf{Pourquoi générer plutôt que prédire.} La génération (i) fournit des images d'entraînement pour les configurations jamais filmées, ce qu'aucun classifieur ne peut faire, et (ii) montre à Léa ce que le système a compris d'une fiche texte avant qu'il étiquette quoi que ce soit, ce qui sert de contrôle visuel de l'alignement.
+
+\textbf{Pourquoi pas un VLM.} Un VLM (modèle vision-langage) généraliste sait étiqueter couleur, forme et taille sans entraînement. Le gain sur le temps d'annotation ne suffit donc pas à justifier le projet. Le VLM ne couvre pas trois besoins. Il ne crée aucune image d'une configuration jamais filmée. Il ne signale pas ses erreurs, alors que les confusions entre attributs proches sont les plus coûteuses. Enfin, il coûte à chaque image, et il envoie les images de la cellule chez un fournisseur, ou il demande un serveur GPU sur place. Notre audit indique à l'avance quelles confusions sont possibles et quelles ancres les lèvent. La baseline E1b mesure l'écart réel.
 
 %==============================================================
 \section{Produit cible (TO BE)}
@@ -232,7 +236,36 @@ Optimiste (150\,000 img, 0,45 min, 50 €/h) & 59\,250 € & 28\,000 € & $+111
 \end{tabular}
 \end{center}
 
-\textbf{Lecture.} Le paramètre décisif est le \emph{volume} d'images. Pour une seule cellule, le ROI de la première année est négatif dans les scénarios central et pessimiste. Le projet devient rentable s'il est mutualisé sur plusieurs cellules ou plusieurs lignes de produits. Ces chiffres ne démontrent pas la valeur causale de la Gen AI : c'est le rôle de H1.
+\textbf{Lecture.} Le paramètre décisif est le \emph{volume} d'images. Pour une seule cellule, le ROI de la première année est négatif dans les scénarios central et pessimiste. Ce gain est aussi fragile : un VLM généraliste peut faire la même annotation. Si E1b montre qu'un VLM étiquette MPI3D-real assez bien, le temps d'annotation gagné ne compte plus dans le business case. Le business case repose alors sur les trois leviers ci-dessous, qu'un VLM ne fournit pas. Ces chiffres ne démontrent pas la valeur causale de la Gen AI : c'est le rôle de H1.
+
+\textbf{Seuils de rentabilité.} Les leviers suivants dépendent de valeurs que nous ne connaissons pas, par exemple le coût d'une erreur de tri. Nous ne les estimons pas. Nous calculons la valeur minimale qui rend le projet rentable dès la première année, à partir du scénario central (\texttt{roi.py}, \texttt{02\_seuils\_roi.csv}). Il manque à une cellule seule 16\,375 € pour atteindre l'équilibre la première année (coût de l'année 1 moins gain net). Le client vérifie ensuite si sa valeur réelle dépasse le seuil.
+
+\begin{center}\small
+\begin{tabularx}{\textwidth}{@{}P{3.3cm}LP{4.6cm}@{}}
+\toprule
+Levier & Hypothèses [H] & Seuil [C] \\
+\midrule
+Mutualisation & Investissement et maintenance partagés ; calcul payé par cellule & ROI année 1 : $+0{,}7$ \% à 2 cellules, $+43{,}3$ \% à 3, $+81{,}7$ \% à 4 \\
+Erreurs de tri évitées & H1 tenue (+10 points d'exactitude sur les configurations rares) ; 100\,000 pièces/an, 1 \% rares & 163,8 € par erreur évitée \\
+ & 500\,000 pièces/an, 1 \% rares & 32,8 € par erreur évitée \\
+ & 1\,000\,000 pièces/an, 5 \% rares & 3,3 € par erreur évitée \\
+Mise en service plus rapide & 120 nouvelles références par an ; 1, 3 ou 5 jours gagnés par référence & 136,5, 45,5 ou 27,3 € par référence et par jour \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\textbf{Les trois leviers qu'un VLM ne fournit pas.}
+\begin{enumerate}
+\item \emph{Génération des configurations manquantes.} Une nouvelle référence peut être triée avant toute séance photo. La valeur est le nombre de jours gagnés par référence, multiplié par ce que coûte un jour sans tri automatique (tri manuel ou débit perdu).
+\item \emph{Qualité garantie.} Une erreur d'étiquette passe le contrôle humain, entre dans le modèle du robot et provoque des erreurs de tri. L'audit des symétries réduit ce risque avant l'entraînement. Si H1 est tenue, chaque point d'exactitude gagné sur les configurations rares devient un nombre d'erreurs évitées, donc des euros.
+\item \emph{Coût d'usage local.} Les encodeurs (1 à 8 M de paramètres) tournent sur place. Une image de plus ne coûte presque rien, alors qu'un VLM par API se paie à chaque image. Les images de références pas encore sorties restent dans l'usine, et la version du modèle ne change pas sans décision de l'équipe. Avec un VLM par API, chaque mise à jour du fournisseur oblige à valider de nouveau les étiquettes.
+\end{enumerate}
+
+\textbf{Métrique de comparaison : le coût par étiquette juste.} Pour comparer l'annotation manuelle, le VLM et notre chaîne, nous divisons le coût complet par le nombre d'étiquettes justes :
+\[
+C = \frac{F + V\,(c_{\mathrm{inf}} + c_{\mathrm{rev}} + p_{\mathrm{nd}}\,c_{\mathrm{err}})}{V\,(1-p_{\mathrm{err}})}
+\]
+$F$ est le coût fixe (investissement, maintenance), $V$ le volume d'images, $c_{\mathrm{inf}}$ le coût d'inférence par image, $c_{\mathrm{rev}}$ le coût de revue humaine par image, $p_{\mathrm{err}}$ le taux d'erreur, $p_{\mathrm{nd}}$ le taux d'erreur non détectée par la revue et $c_{\mathrm{err}}$ le coût d'une erreur qui atteint le robot. L'annotation manuelle a un $c_{\mathrm{rev}}$ élevé. Le VLM a un $F$ faible, mais un $c_{\mathrm{inf}}$ non nul et un $p_{\mathrm{nd}}$ inconnu. Notre chaîne a un $F$ élevé, un $c_{\mathrm{inf}}$ presque nul, et elle vise un $p_{\mathrm{nd}}$ faible grâce à l'audit. E1 et E1b mesurent $p_{\mathrm{err}}$ et $c_{\mathrm{inf}}$. Le prix d'un VLM par API viendra de la grille tarifaire publiée du fournisseur choisi.
 
 %==============================================================
 \section{Risques}
@@ -242,6 +275,7 @@ Optimiste (150\,000 img, 0,45 min, 50 €/h) & 59\,250 € & 28\,000 € & $+111
 \toprule
 Risque & Proba. / impact & Réduction / test \\
 \midrule
+Un VLM généraliste étiquette aussi bien & moyenne / fort & Baseline E1b avant tout développement. Si le VLM égale E1, le business case repose seulement sur la génération et l'audit \\
 Qualité : attribut faux (mauvaise couleur) & moyenne / fort & Audit des symétries avant génération, ancres, classifieur de contrôle, revue humaine \\
 Alignement : solveur bloqué, ancres mal choisies & moyenne / fort & Ancres choisies comme base du groupe de symétrie ; test sur le noyau exact avant tout entraînement (fait) \\
 Géométrie texte trop pauvre & moyenne / fort & Contrôle de deux seeds du JEPA texte entre elles ; dimension $k$ prise en fin de bloc spectral \\
@@ -267,6 +301,8 @@ Dépendance modèle & faible / faible & Modèles entraînés par le groupe, aucu
 \textbf{E0 (préalable).} Mesurer nous-mêmes le temps d'annotation manuelle sur 200 images pour remplacer l'hypothèse de 0,5 min.
 
 \textbf{E1 (baseline sans Gen AI).} Classifieur entraîné sur images réelles seules, plus recherche du plus proche voisin réel dans l'espace aligné. Métrique : exactitude par attribut sur le test des combinaisons retirées.
+
+\textbf{E1b (baseline VLM).} Un VLM généraliste étiquette les images de test sans entraînement (zero-shot). Mesures : exactitude par attribut, matrice de confusion des teintes voisines, coût et temps par image. Les images font 64$\times$64, une résolution faible pour un VLM : nous testons aussi les images agrandies, pour que la comparaison reste équitable. Si le VLM atteint l'exactitude de E1, l'annotation sort du business case.
 
 \textbf{E2 (avec diffusion).} Même protocole avec les images générées ajoutées. Mesures : exactitude, diversité, FID, latence et coût. Au moins deux configurations de diffusion (DDPM et flow matching, avec et sans guidance).
 

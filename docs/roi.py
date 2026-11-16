@@ -21,3 +21,28 @@ for name, p in S.items():
     print(name, rows[-1])
 with open("02_hypotheses_roi.csv", "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=rows[0].keys()); w.writeheader(); w.writerows(rows)
+
+# Break-even thresholds on the central scenario, written to 02_seuils_roi.csv.
+c, net = S["central"], rows[1]["gain_net"]
+seuils = []
+for n in range(1, 5):  # n cells share the investment and maintenance; compute is per cell
+    cost1 = c["invest"] + c["maint"] + n * c["compute"]
+    seuils.append(dict(levier="cellules", entree=n, seuil=round((n * net - cost1) / cost1 * 100, 1),
+                       unite="ROI annee 1 %"))
+gap = c["invest"] + c["compute"] + c["maint"] - net  # what one cell lacks to break even in year 1
+seuils.append(dict(levier="ecart", entree="1 cellule", seuil=gap, unite="EUR manquants annee 1"))
+DELTA_ACC = 0.10  # H1 threshold: accuracy points gained on held-out combinations
+for picks, rare in [(100_000, 0.01), (500_000, 0.01), (1_000_000, 0.05)]:
+    seuils.append(dict(levier="erreurs", entree=f"{picks} pieces, {rare:.0%} rares",
+                       seuil=round(gap / (picks * rare * DELTA_ACC), 1),
+                       unite="EUR par erreur evitee"))
+REFS = 120  # new references per year, same as the volume hypothesis
+for days in (1, 3, 5):
+    seuils.append(dict(levier="mise en service", entree=f"{days} j gagnes par reference",
+                       seuil=round(gap / (REFS * days), 1), unite="EUR par reference et par jour"))
+for s in seuils:
+    print(s)
+with open("02_seuils_roi.csv", "w", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=seuils[0].keys())
+    w.writeheader()
+    w.writerows(seuils)
